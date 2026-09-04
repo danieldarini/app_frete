@@ -1,6 +1,7 @@
 import os
 import requests
 import streamlit as st
+import pandas as pd
 from bs4 import BeautifulSoup
 
 # Configuração da página
@@ -87,7 +88,8 @@ if st.button("🚀 Calcular Previsão de Frete", type="primary"):
             
     except Exception as e:
         st.error(f"Não foi possível conectar à API em `{API_URL}`. Verifique se o servidor está online.")
-        # --- VISUALIZAÇÃO DE HISTÓRICO ---
+
+# --- VISUALIZAÇÃO DE HISTÓRICO ---
 st.divider()
 st.subheader("📈 Histórico do Mercado (SCFI & Câmbio)")
 
@@ -104,7 +106,7 @@ if os.path.exists("dados_mercado.csv"):
         with tab2:
             st.line_chart(df_hist.set_index("Data")["USD_BRL"])
             
-    except Exception:
+    except Exception as e:
         st.info("Aguardando estrutura válida no arquivo de histórico para gerar os gráficos.")
 else:
     st.info("Nenhum histórico registrado ainda. O agendador criará o arquivo 'dados_mercado.csv' automaticamente na primeira coleta.")
