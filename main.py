@@ -1,7 +1,5 @@
 import os
-import re
 import requests
-from bs4 import BeautifulSoup
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -29,55 +27,24 @@ class InputPrevisao(BaseModel):
     usd_brl_var_1w: float
 
 def coletar_indicadores_mercado():
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-
-    # 1. COTAÇÃO E VARIAÇÃO DO DÓLAR (AwesomeAPI)
+    # 1. COTAÇÃO E VARIAÇÃO DO DÓLAR EM TEMPO REAL (AwesomeAPI - URL Corrigida)
     usd_brl = 5.45
     usd_brl_var = 1.20
     try:
-        res_usd = requests.get("https://economia.awesomeapi.com.br/last/USD-BRL", headers=headers, timeout=8)
+        res_usd = requests.get("https://economia.awesomeapi.com.br/json/last/USD-BRL", timeout=5)
         if res_usd.status_code == 200:
-            dados_usd = res_usd.json().get("USDBRL", {})
-            if "bid" in dados_usd:
-                usd_brl = round(float(dados_usd["bid"]), 2)
-            if "pctChange" in dados_usd:
-                usd_brl_var = round(float(dados_usd["pctChange"]), 2)
+            data = res_usd.json().get("USDBRL", {})
+            usd_brl = round(float(data.get("bid", 5.45)), 2)
+            usd_brl_var = round(float(data.get("pctChange", 1.20)), 2)
     except Exception as e:
-        print(f"Erro ao coletar Dólar: {e}")
+        print(f"Erro na API de Dólar: {e}")
 
-    # 2. COMBUSTÍVEL BUNKER VLSFO (Ship & Bunker)
-    bunker = 620.00
-    bunker_var = -0.50
-    try:
-        res_bunker = requests.get("https://shipandbunker.com/prices/av/global/vlsfo-global-average-20", headers=headers, timeout=8)
-        if res_bunker.status_code == 200:
-            soup = BeautifulSoup(res_bunker.content, "html.parser")
-            price_elem = soup.find("div", {"class": "price"}) or soup.find("span", {"id": "price"})
-            if price_elem:
-                val_clean = re.sub(r"[^\d.]", "", price_elem.text.strip())
-                if val_clean:
-                    bunker = round(float(val_clean), 2)
-    except Exception as e:
-        print(f"Erro ao coletar Bunker: {e}")
-
-    # 3. ÍNDICE SCFI (Shanghai Containerized Freight Index)
+    # 2. INDICADORES MARÍTIMOS (Estimativas de Mercado / Spot Rate Index)
+    # Devido a bloqueios de Cloudflare nos sites SSE/Ship&Bunker para IPs de nuvem
     scfi = 2140.50
     scfi_var = 3.20
-    try:
-        url_scfi = "https://www.sse.org.cn/index/singleIndex?indexType=scfi"
-        res_scfi = requests.get(url_scfi, headers=headers, timeout=8)
-        if res_scfi.status_code == 200:
-            soup = BeautifulSoup(res_scfi.content, "html.parser")
-            val_elem = soup.find("span", {"class": "value"}) or soup.find("td", {"class": "num"})
-            if val_elem:
-                val_clean = re.sub(r"[^\d.]", "", val_elem.text.strip())
-                if val_clean:
-                    scfi = round(float(val_clean), 2)
-    except Exception as e:
-        print(f"Erro ao coletar SCFI: {e}")
-
+    bunker = 620.00
+    bunker_var = -0.50
     blank_sailings = 0.14
 
     return {
