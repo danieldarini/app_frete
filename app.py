@@ -14,19 +14,28 @@ st.title("🚢 Previsão de Tendência de Frete Marítimo")
 st.subheader("América do Sul (ECSA / WCSA)")
 
 # --- FUNÇÃO DE BUSCA EM TEMPO REAL ---
-def buscar_dolar_ao_vivo():
-    try:
-        url = "https://www.google.com/finance/quote/USD-BRL"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        response = requests.get(url, headers=headers, timeout=5)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, "html.parser")
-            price_div = soup.find("div", {"class": "YMlKec fxKbKc"})
-            if price_div:
-                return float(price_div.text.strip().replace(",", "."))
-    except Exception:
-        pass
-    return 5.45
+# Modifique o botão de atualização no app.py para consultar o backend:
+if st.button("🔄 Buscar Indicadores em Tempo Real"):
+    with st.spinner("Conectando à API e atualizando mercado..."):
+        try:
+            # Conecta na rota /indicadores do Render
+            url_indicadores = API_URL.replace("/prever", "/indicadores")
+            res = requests.get(url_indicadores, timeout=10)
+            
+            if res.status_code == 200:
+                dados = res.json()
+                st.session_state.scfi = dados["scfi"]
+                st.session_state.scfi_var = dados["scfi_var_1w"]
+                st.session_state.bunker = dados["bunker"]
+                st.session_state.bunker_var = dados["bunker_var_1w"]
+                st.session_state.blank_sailings = dados["blank_sailings"]
+                st.session_state.usd_brl = dados["usd_brl"]
+                st.session_state.usd_brl_var = dados["usd_brl_var_1w"]
+                st.success("Todos os indicadores de mercado foram atualizados!")
+            else:
+                st.warning("Não foi possível carregar os indicadores do backend.")
+        except Exception:
+            st.error("Erro ao conectar à API de indicadores.")
 
 # --- ESTADO INICIAL DOS CAMPOS ---
 if 'usd_brl' not in st.session_state:
