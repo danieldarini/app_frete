@@ -37,14 +37,16 @@ if st.button("🔄 Buscar Indicadores em Tempo Real", key="btn_atualizar_indicad
             
             if res.status_code == 200:
                 dados = res.json()
-                st.session_state.scfi = dados["scfi"]
-                st.session_state.scfi_var = dados["scfi_var_1w"]
-                st.session_state.bunker = dados["bunker"]
-                st.session_state.bunker_var = dados["bunker_var_1w"]
-                st.session_state.blank_sailings = dados["blank_sailings"]
-                st.session_state.usd_brl = dados["usd_brl"]
-                st.session_state.usd_brl_var = dados["usd_brl_var_1w"]
-                st.success("Todos os indicadores de mercado foram atualizados!")
+                st.session_state.scfi = float(dados["scfi"])
+                st.session_state.scfi_var = float(dados["scfi_var_1w"])
+                st.session_state.bunker = float(dados["bunker"])
+                st.session_state.bunker_var = float(dados["bunker_var_1w"])
+                st.session_state.blank_sailings = float(dados["blank_sailings"])
+                st.session_state.usd_brl = float(dados["usd_brl"])
+                st.session_state.usd_brl_var = float(dados["usd_brl_var_1w"])
+                
+                # Força a atualização da interface com os novos dados
+                st.rerun()
             else:
                 st.warning("Serviço de indicadores indisponível no momento.")
         except Exception:
