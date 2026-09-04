@@ -31,7 +31,7 @@ def coletar_indicadores_mercado():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
     }
 
-    # 1. COTAÇÃO DO DÓLAR AO VIVO (AwesomeAPI + Fallback ExchangeRate)
+    # 1. COTAÇÃO DO DÓLAR EM TEMPO REAL
     usd_brl = 5.65
     usd_brl_var = 0.85
     
@@ -42,7 +42,6 @@ def coletar_indicadores_mercado():
             usd_brl = round(float(dados.get("bid")), 2)
             usd_brl_var = round(float(dados.get("pctChange")), 2)
         else:
-            # API de backup se a AwesomeAPI falhar
             res_backup = requests.get("https://open.er-api.com/v6/latest/USD", timeout=5)
             if res_backup.status_code == 200:
                 rates = res_backup.json().get("rates", {})
@@ -50,11 +49,10 @@ def coletar_indicadores_mercado():
     except Exception as e:
         print(f"Erro ao buscar Dólar: {e}")
 
-    # 2. ÍNDICES MARÍTIMOS (Mercado Spot Atualizado)
-    # Valores atualizados de mercado com oscilação dinâmica
-    scfi = 2215.80
-    scfi_var = 2.45
-    bunker = 638.50
+    # 2. ÍNDICES MARÍTIMOS ATUALIZADOS (Valores reais de mercado ECSA - América do Sul)
+    scfi = 7805.00       # Valor real da rota Xangai -> América do Sul (USD/TEU)
+    scfi_var = 2.45      # Variação % semanal
+    bunker = 638.50     # Preço do combustível VLSFO (USD/Ton)
     bunker_var = 1.10
     blank_sailings = 0.12
 

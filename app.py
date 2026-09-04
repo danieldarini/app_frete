@@ -10,21 +10,21 @@ API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/prever")
 st.title("🚢 Previsão de Tendência de Frete Marítimo")
 st.subheader("América do Sul (ECSA / WCSA)")
 
-# Inicialização de Session State
+# Inicialização do Session State com valores de mercado atualizados
 if 'scfi' not in st.session_state:
-    st.session_state['scfi'] = 2140.50
+    st.session_state['scfi'] = 7805.00
 if 'scfi_var' not in st.session_state:
-    st.session_state['scfi_var'] = 3.20
+    st.session_state['scfi_var'] = 2.45
 if 'bunker' not in st.session_state:
-    st.session_state['bunker'] = 620.00
+    st.session_state['bunker'] = 638.50
 if 'bunker_var' not in st.session_state:
-    st.session_state['bunker_var'] = -0.50
+    st.session_state['bunker_var'] = 1.10
 if 'blank_sailings' not in st.session_state:
-    st.session_state['blank_sailings'] = 0.14
+    st.session_state['blank_sailings'] = 0.12
 if 'usd_brl' not in st.session_state:
-    st.session_state['usd_brl'] = 5.45
+    st.session_state['usd_brl'] = 5.65
 if 'usd_brl_var' not in st.session_state:
-    st.session_state['usd_brl_var'] = 1.20
+    st.session_state['usd_brl_var'] = 0.85
 
 # --- BOTÃO DE ATUALIZAÇÃO ---
 if st.button("🔄 Buscar Indicadores em Tempo Real", key="btn_atualizar_indicadores"):
@@ -43,7 +43,7 @@ if st.button("🔄 Buscar Indicadores em Tempo Real", key="btn_atualizar_indicad
                 st.session_state['usd_brl'] = float(dados["usd_brl"])
                 st.session_state['usd_brl_var'] = float(dados["usd_brl_var_1w"])
                 
-                st.toast("✅ Todos os indicadores foram atualizados na tela!")
+                st.toast("✅ Indicadores atualizados com sucesso!")
                 st.rerun()
             else:
                 st.error("Servidor backend indisponível.")
@@ -52,11 +52,11 @@ if st.button("🔄 Buscar Indicadores em Tempo Real", key="btn_atualizar_indicad
 
 st.divider()
 
-# --- FORMULÁRIO COM VALORES DINÂMICOS ---
+# --- FORMULÁRIO COM VALORES ATUALIZADOS ---
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    scfi = st.number_input("Índice SCFI Atual (USD/TEU)", value=st.session_state['scfi'], step=10.0)
+    scfi = st.number_input("Índice SCFI Atual (USD/TEU)", value=st.session_state['scfi'], step=50.0)
     scfi_var = st.number_input("Variação Semanal SCFI (%)", value=st.session_state['scfi_var']) / 100
 
 with col2:
