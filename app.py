@@ -87,3 +87,24 @@ if st.button("🚀 Calcular Previsão de Frete", type="primary"):
             
     except Exception as e:
         st.error(f"Não foi possível conectar à API em `{API_URL}`. Verifique se o servidor está online.")
+        # --- VISUALIZAÇÃO DE HISTÓRICO ---
+st.divider()
+st.subheader("📈 Histórico do Mercado (SCFI & Câmbio)")
+
+if os.path.exists("dados_mercado.csv"):
+    try:
+        df_hist = pd.read_csv("dados_mercado.csv")
+        df_hist["Data"] = pd.to_datetime(df_hist["Data"])
+        
+        tab1, tab2 = st.tabs(["Índice SCFI", "Dólar (USD/BRL)"])
+        
+        with tab1:
+            st.line_chart(df_hist.set_index("Data")[["SCFI_Geral", "SCFI_America_Sul"]])
+            
+        with tab2:
+            st.line_chart(df_hist.set_index("Data")["USD_BRL"])
+            
+    except Exception:
+        st.info("Aguardando estrutura válida no arquivo de histórico para gerar os gráficos.")
+else:
+    st.info("Nenhum histórico registrado ainda. O agendador criará o arquivo 'dados_mercado.csv' automaticamente na primeira coleta.")
