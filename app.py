@@ -2,23 +2,36 @@ import os
 import requests
 import streamlit as st
 import pandas as pd
-from bs4 import BeautifulSoup
 
 # Configuração da página
 st.set_page_config(page_title="Previsão de Frete Marítimo", page_icon="🚢", layout="wide")
 
-# Detecta automaticamente a URL da API (Ambiente de Produção ou Localhost)
+# Detecta automaticamente a URL da API (Produção ou Local)
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/prever")
 
 st.title("🚢 Previsão de Tendência de Frete Marítimo")
 st.subheader("América do Sul (ECSA / WCSA)")
 
-# --- FUNÇÃO DE BUSCA EM TEMPO REAL ---
-# Modifique o botão de atualização no app.py para consultar o backend:
-if st.button("🔄 Buscar Indicadores em Tempo Real"):
+# --- INICIALIZAÇÃO DO SESSION STATE ---
+if 'scfi' not in st.session_state:
+    st.session_state.scfi = 2140.50
+if 'scfi_var' not in st.session_state:
+    st.session_state.scfi_var = 3.20
+if 'bunker' not in st.session_state:
+    st.session_state.bunker = 620.00
+if 'bunker_var' not in st.session_state:
+    st.session_state.bunker_var = -0.50
+if 'blank_sailings' not in st.session_state:
+    st.session_state.blank_sailings = 0.14
+if 'usd_brl' not in st.session_state:
+    st.session_state.usd_brl = 5.45
+if 'usd_brl_var' not in st.session_state:
+    st.session_state.usd_brl_var = 1.20
+
+# --- BOTÃO DE ATUALIZAÇÃO VIA API ---
+if st.button("🔄 Buscar Indicadores em Tempo Real", key="btn_atualizar_indicadores"):
     with st.spinner("Conectando à API e atualizando mercado..."):
         try:
-            # Conecta na rota /indicadores do Render
             url_indicadores = API_URL.replace("/prever", "/indicadores")
             res = requests.get(url_indicadores, timeout=10)
             
@@ -33,42 +46,32 @@ if st.button("🔄 Buscar Indicadores em Tempo Real"):
                 st.session_state.usd_brl_var = dados["usd_brl_var_1w"]
                 st.success("Todos os indicadores de mercado foram atualizados!")
             else:
-                st.warning("Não foi possível carregar os indicadores do backend.")
+                st.warning("Serviço de indicadores indisponível no momento.")
         except Exception:
-            st.error("Erro ao conectar à API de indicadores.")
-
-# --- ESTADO INICIAL DOS CAMPOS ---
-if 'usd_brl' not in st.session_state:
-    st.session_state.usd_brl = 5.45
-if 'scfi' not in st.session_state:
-    st.session_state.scfi = 2140.50
-
-if st.button("🔄 Buscar Indicadores em Tempo Real"):
-    with st.spinner("Consultando cotação de mercado..."):
-        cotacao = buscar_dolar_ao_vivo()
-        st.session_state.usd_brl = cotacao
-        st.success("Dados atualizados com sucesso!")
+            st.error("Não foi possível conectar à rota de indicadores.")
 
 st.divider()
 
+# --- FORMULÁRIO DE ENTRADA ---
 col1, col2, col3 = st.columns(3)
 
 with col1:
     scfi = st.number_input("Índice SCFI Atual (USD/TEU)", value=st.session_state.scfi, step=10.0)
-    scfi_var = st.number_input("Variação Semanal SCFI (%)", value=3.20) / 100
+    scfi_var = st.number_input("Variação Semanal SCFI (%)", value=st.session_state.scfi_var) / 100
 
 with col2:
-    bunker = st.number_input("Combustível VLSFO (USD/Ton)", value=620.00, step=5.0)
-    bunker_var = st.number_input("Variação Semanal Bunker (%)", value=-0.50) / 100
+    bunker = st.number_input("Combustível VLSFO (USD/Ton)", value=st.session_state.bunker, step=5.0)
+    bunker_var = st.number_input("Variação Semanal Bunker (%)", value=st.session_state.bunker_var) / 100
 
 with col3:
-    blank_sailings = st.slider("Taxa de Cancelamento (Blank Sailings)", 0.0, 0.5, 0.14, 0.005)
+    blank_sailings = st.slider("Taxa de Cancelamento (Blank Sailings)", 0.0, 0.5, st.session_state.blank_sailings, 0.005)
     usd_brl = st.number_input("Cotação Dólar (USD/BRL)", value=st.session_state.usd_brl, step=0.01)
-    usd_brl_var = st.number_input("Variação Semanal Câmbio (%)", value=1.20) / 100
+    usd_brl_var = st.number_input("Variação Semanal Câmbio (%)", value=st.session_state.usd_brl_var) / 100
 
 st.divider()
 
-if st.button("🚀 Calcular Previsão de Frete", type="primary"):
+# --- PREVISÃO ---
+if st.button("🚀 Calcular Previsão de Frete", type="primary", key="btn_calcular_previsao"):
     payload = {
         "scfi": scfi,
         "bunker": bunker,
@@ -95,10 +98,10 @@ if st.button("🚀 Calcular Previsão de Frete", type="primary"):
         else:
             st.warning("Erro de comunicação com a API de produção.")
             
-    except Exception as e:
-        st.error(f"Não foi possível conectar à API em `{API_URL}`. Verifique se o servidor está online.")
+    except Exception:
+        st.error(f"Não foi possível conectar à API em `{API_URL}`.")
 
-# --- VISUALIZAÇÃO DE HISTÓRICO ---
+# --- HISTÓRICO ---
 st.divider()
 st.subheader("📈 Histórico do Mercado (SCFI & Câmbio)")
 
@@ -115,7 +118,7 @@ if os.path.exists("dados_mercado.csv"):
         with tab2:
             st.line_chart(df_hist.set_index("Data")["USD_BRL"])
             
-    except Exception as e:
+    except Exception:
         st.info("Aguardando estrutura válida no arquivo de histórico para gerar os gráficos.")
 else:
-    st.info("Nenhum histórico registrado ainda. O agendador criará o arquivo 'dados_mercado.csv' automaticamente na primeira coleta.")
+    st.info("Nenhum histórico registrado ainda.")
