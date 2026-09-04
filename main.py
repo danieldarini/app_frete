@@ -1,138 +1,125 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-import joblib
-import pandas as pd
-from contextlib import asynccontextmanager
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
-import datetime
-
-# Importa as funções de coleta do seu script coleta.py
-from coleta import buscar_dolar, buscar_scfi_exemplo
-
-# --- 1. ROTINA DE COLETA RECORRENTE ---
-def rotina_coleta_semanal():
-    data_hoje = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"\n⏰ [{data_hoje}] Executando coleta automática agendada...")
-    
-    cotacao_usd = buscar_dolar()
-    dados_frete = buscar_scfi_exemplo()
-    
-    novo_registro = pd.DataFrame([{
-        "Data": dados_frete["data"],
-        "USD_BRL": cotacao_usd,
-        "SCFI_Geral": dados_frete["scfi_composite"],
-        "SCFI_America_Sul": dados_frete["scfi_south_america"]
-    }])
-    
-    # Anexa o registro ao histórico em CSV
-    novo_registro.to_csv("dados_mercado.csv", mode='a', header=False, index=False)
-    print("✅ Histórico em 'dados_mercado.csv' atualizado automaticamente!")
-
-# --- 2. CONFIGURAÇÃO DO AGENDADOR NO CICLO DE VIDA DA API ---
-scheduler = BackgroundScheduler()
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Código executado ao LIGAR o servidor FastAPI
-    scheduler.add_job(
-        rotina_coleta_semanal,
-        trigger=CronTrigger(day_of_week='fri', hour=18, minute=0),
-        id='coleta_semanal_job',
-        replace_existing=True
-    )
-    scheduler.start()
-    print("🚀 BackgroundScheduler iniciado: Coleta agendada para toda sexta-feira às 18:00.")
-    
-    yield  # A aplicação roda normalmente aqui
-    
-    # Código executado ao DESLIGAR o servidor FastAPI
-    scheduler.shutdown()
-    print("🛑 BackgroundScheduler encerrado.")
-
-# --- 3. INICIALIZAÇÃO DO FASTAPI ---
-app = FastAPI(
-    title="API de Previsão de Frete Marítimo",
-    description="Servidor de IA com agendador de coleta automática integrado.",
-    version="2.0",
-    lifespan=lifespan
-)
-
-# Carrega o modelo treinado
-model = joblib.load('modelo_frete.pkl')
-
-class DadosMercado(BaseModel):
-    scfi: float = 2140.5
-    bunker: float = 620.0
-    blank_sailings: float = 0.145
-    usd_brl: float = 5.45
-    scfi_var_1w: float = 0.032
-    bunker_var_1w: float = -0.005
-    usd_brl_var_1w: float = 0.012
-
-@app.get("/")
-def home():
-    return {"status": "online", "agendador_ativo": scheduler.running}
-
-@app.post("/prever")
-def prever_tendencia(dados: DadosMercado):
-    input_df = pd.DataFrame([{
-        'scfi': dados.scfi,
-        'bunker': dados.bunker,
-        'blank_sailings': dados.blank_sailings,
-        'usd_brl': dados.usd_brl,
-        'scfi_var_1w': dados.scfi_var_1w,
-        'bunker_var_1w': dados.bunker_var_1w,
-        'usd_brl_var_1w': dados.usd_brl_var_1w
-    }])
-    
-    predicao = model.predict(input_df)[0]
-    probabilidades = model.predict_proba(input_df)[0]
-    
-    if predicao == 1:
-        sinal = "BULLISH"
-        label = "Previsão de Alta"
-        confianca = probabilidades[1]
-    else:
-        sinal = "BEARISH"
-        label = "Previsão de Baixa"
-        confianca = probabilidades[0]
-        
-    return {
-        "sinal": sinal,
-        "label": label,
-        "confianca_percentual": f"{round(confianca * 100, 1)}%",
-        "dados_recebidos": dados.dict()
-    }
+import os
+import re
 import requests
 from bs4 import BeautifulSoup
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+app = FastAPI(
+    title="API de Previsão de Frete Marítimo",
+    description="Backend para cálculo de tendência de frete marítimo e coleta de indicadores em tempo real."
+)
+
+# Habilita CORS para permitir chamadas do Streamlit
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class InputPrevisao(BaseModel):
+    scfi: float
+    bunker: float
+    blank_sailings: float
+    usd_brl: float
+    scfi_var_1w: float
+    bunker_var_1w: float
+    usd_brl_var_1w: float
 
 def coletar_indicadores_mercado():
-    # Coleta Cotação Dólar
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+    }
+
+    # 1. CÓTAÇÃO E VARIAÇÃO DO DÓLAR (AwesomeAPI)
     usd_brl = 5.45
+    usd_brl_var = 1.20
     try:
-        url = "https://www.google.com/finance/quote/USD-BRL"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(url, headers=headers, timeout=5)
-        if res.status_code == 200:
-            soup = BeautifulSoup(res.content, "html.parser")
-            price_div = soup.find("div", {"class": "YMlKec fxKbKc"})
-            if price_div:
-                usd_brl = float(price_div.text.strip().replace(",", "."))
+        res_usd = requests.get("https://economia.awesomeapi.com.br/json/last/USD-BRL", timeout=5)
+        if res_usd.status_code == 200:
+            data_usd = res_usd.json().get("USDBRL", {})
+            usd_brl = round(float(data_usd.get("bid", 5.45)), 2)
+            usd_brl_var = round(float(data_usd.get("pctChange", 1.20)), 2)
     except Exception:
         pass
 
-    # Estimativas atualizadas dos demais indicadores
+    # 2. COMBUSTÍVEL BUNKER VLSFO (Ship & Bunker - Global Average)
+    bunker = 620.00
+    bunker_var = -0.50
+    try:
+        res_bunker = requests.get("https://shipandbunker.com/prices/av/global/vlsfo-global-average-20", headers=headers, timeout=5)
+        if res_bunker.status_code == 200:
+            soup = BeautifulSoup(res_bunker.content, "html.parser")
+            price_elem = soup.find("div", {"class": "price"}) or soup.find("span", {"id": "price"})
+            if price_elem:
+                val_clean = re.sub(r"[^\d.]", "", price_elem.text.strip())
+                if val_clean:
+                    bunker = round(float(val_clean), 2)
+    except Exception:
+        pass
+
+    # 3. ÍNDICE SCFI (Shanghai Containerized Freight Index)
+    scfi = 2140.50
+    scfi_var = 3.20
+    try:
+        url_scfi = "https://www.sse.org.cn/index/singleIndex?indexType=scfi"
+        res_scfi = requests.get(url_scfi, headers=headers, timeout=5)
+        if res_scfi.status_code == 200:
+            soup = BeautifulSoup(res_scfi.content, "html.parser")
+            val_elem = soup.find("span", {"class": "value"}) or soup.find("td", {"class": "num"})
+            if val_elem:
+                val_clean = re.sub(r"[^\d.]", "", val_elem.text.strip())
+                if val_clean:
+                    scfi = round(float(val_clean), 2)
+    except Exception:
+        pass
+
+    # 4. TAXA DE CANCELAMENTO (Blank Sailings)
+    blank_sailings = 0.14
+
     return {
-        "scfi": 2140.50,
-        "scfi_var_1w": 3.20,
-        "bunker": 620.00,
-        "bunker_var_1w": -0.50,
-        "blank_sailings": 0.14,
+        "scfi": scfi,
+        "scfi_var_1w": scfi_var,
+        "bunker": bunker,
+        "bunker_var_1w": bunker_var,
+        "blank_sailings": blank_sailings,
         "usd_brl": usd_brl,
-        "usd_brl_var_1w": 1.20
+        "usd_brl_var_1w": usd_brl_var
     }
+
+@app.get("/")
+def home():
+    return {"status": "online", "message": "API de Previsão de Frete Marítimo Operacional"}
 
 @app.get("/indicadores")
 def obter_indicadores():
     return coletar_indicadores_mercado()
+
+@app.post("/prever")
+def prever_frete(dados: InputPrevisao):
+    # Algoritmo heurístico de decisão de frete marítimo
+    score = (
+        (dados.scfi_var_1w * 0.45) +
+        (dados.bunker_var_1w * 0.25) +
+        (dados.usd_brl_var_1w * 0.15) +
+        (dados.blank_sailings * 0.15)
+    )
+
+    if score > 0.01:
+        sinal = "BULLISH"
+        label = "Alta do Frete Prevista"
+        confianca = min(50.0 + (score * 1000), 96.5)
+    else:
+        sinal = "BEARISH"
+        label = "Queda do Frete Prevista"
+        confianca = min(50.0 + (abs(score) * 1000), 96.5)
+
+    return {
+        "sinal": sinal,
+        "label": label,
+        "confianca_percentual": f"{confianca:.1f}%",
+        "score_calculado": round(score, 4)
+    }
