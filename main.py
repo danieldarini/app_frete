@@ -11,7 +11,6 @@ app = FastAPI(
     description="Backend para cálculo de tendência de frete marítimo e coleta de indicadores em tempo real."
 )
 
-# Habilita CORS para permitir chamadas do Streamlit
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,26 +30,28 @@ class InputPrevisao(BaseModel):
 
 def coletar_indicadores_mercado():
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
-    # 1. CÓTAÇÃO E VARIAÇÃO DO DÓLAR (AwesomeAPI)
+    # 1. COTAÇÃO E VARIAÇÃO DO DÓLAR (AwesomeAPI)
     usd_brl = 5.45
     usd_brl_var = 1.20
     try:
-        res_usd = requests.get("https://economia.awesomeapi.com.br/json/last/USD-BRL", timeout=5)
+        res_usd = requests.get("https://economia.awesomeapi.com.br/last/USD-BRL", headers=headers, timeout=8)
         if res_usd.status_code == 200:
-            data_usd = res_usd.json().get("USDBRL", {})
-            usd_brl = round(float(data_usd.get("bid", 5.45)), 2)
-            usd_brl_var = round(float(data_usd.get("pctChange", 1.20)), 2)
-    except Exception:
-        pass
+            dados_usd = res_usd.json().get("USDBRL", {})
+            if "bid" in dados_usd:
+                usd_brl = round(float(dados_usd["bid"]), 2)
+            if "pctChange" in dados_usd:
+                usd_brl_var = round(float(dados_usd["pctChange"]), 2)
+    except Exception as e:
+        print(f"Erro ao coletar Dólar: {e}")
 
-    # 2. COMBUSTÍVEL BUNKER VLSFO (Ship & Bunker - Global Average)
+    # 2. COMBUSTÍVEL BUNKER VLSFO (Ship & Bunker)
     bunker = 620.00
     bunker_var = -0.50
     try:
-        res_bunker = requests.get("https://shipandbunker.com/prices/av/global/vlsfo-global-average-20", headers=headers, timeout=5)
+        res_bunker = requests.get("https://shipandbunker.com/prices/av/global/vlsfo-global-average-20", headers=headers, timeout=8)
         if res_bunker.status_code == 200:
             soup = BeautifulSoup(res_bunker.content, "html.parser")
             price_elem = soup.find("div", {"class": "price"}) or soup.find("span", {"id": "price"})
@@ -58,15 +59,15 @@ def coletar_indicadores_mercado():
                 val_clean = re.sub(r"[^\d.]", "", price_elem.text.strip())
                 if val_clean:
                     bunker = round(float(val_clean), 2)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Erro ao coletar Bunker: {e}")
 
     # 3. ÍNDICE SCFI (Shanghai Containerized Freight Index)
     scfi = 2140.50
     scfi_var = 3.20
     try:
         url_scfi = "https://www.sse.org.cn/index/singleIndex?indexType=scfi"
-        res_scfi = requests.get(url_scfi, headers=headers, timeout=5)
+        res_scfi = requests.get(url_scfi, headers=headers, timeout=8)
         if res_scfi.status_code == 200:
             soup = BeautifulSoup(res_scfi.content, "html.parser")
             val_elem = soup.find("span", {"class": "value"}) or soup.find("td", {"class": "num"})
@@ -74,10 +75,9 @@ def coletar_indicadores_mercado():
                 val_clean = re.sub(r"[^\d.]", "", val_elem.text.strip())
                 if val_clean:
                     scfi = round(float(val_clean), 2)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Erro ao coletar SCFI: {e}")
 
-    # 4. TAXA DE CANCELAMENTO (Blank Sailings)
     blank_sailings = 0.14
 
     return {
@@ -100,7 +100,6 @@ def obter_indicadores():
 
 @app.post("/prever")
 def prever_frete(dados: InputPrevisao):
-    # Algoritmo heurístico de decisão de frete marítimo
     score = (
         (dados.scfi_var_1w * 0.45) +
         (dados.bunker_var_1w * 0.25) +
