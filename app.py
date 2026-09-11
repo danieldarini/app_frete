@@ -4,6 +4,20 @@ import streamlit as st
 
 st.set_page_config(page_title="Previsão de Frete Marítimo", page_icon="🚢", layout="wide")
 
+# --- ESTILO CSS PERSONALIZADO (Reduz a fonte dos cartões de métricas) ---
+st.markdown("""
+    <style>
+    /* Reduz a fonte do valor principal (ex: R$ 5,10) */
+    [data-testid="stMetricValue"] {
+        font-size: 1.35rem !important;
+    }
+    /* Reduz a fonte do título da métrica */
+    [data-testid="stMetricLabel"] {
+        font-size: 0.85rem !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/prever")
 
 st.title("🚢 Previsão de Tendência de Frete Marítimo")
@@ -51,7 +65,7 @@ if st.button("🔄 Buscar Indicadores em Tempo Real", key="btn_atualizar_indicad
                 st.session_state['val_usd_brl_var'] = float(dados["usd_brl_var_1w"])
                 st.session_state['val_usd_cma_cgm'] = float(dados.get("usd_cma_cgm", 5.55))
                 
-                st.toast("✅ Indicadores atualizados (incluindo Dólar Armador CMA CGM)!")
+                st.toast("✅ Indicadores atualizados com sucesso!")
                 st.rerun()
             else:
                 st.error("Servidor backend indisponível.")
@@ -60,7 +74,7 @@ if st.button("🔄 Buscar Indicadores em Tempo Real", key="btn_atualizar_indicad
 
 st.divider()
 
-# --- CARTOES DE DESTAQUE CAMBIAL ---
+# --- CARTÕES DE DESTAQUE CAMBIAL (FONTE REDUZIDA) ---
 col_m1, col_m2 = st.columns(2)
 with col_m1:
     st.metric("Dólar PTAX / Comercial (DUIMP)", f"R$ {st.session_state['val_usd_brl']:.2f}")
