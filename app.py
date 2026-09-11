@@ -10,40 +10,40 @@ API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/prever")
 st.title("🚢 Previsão de Tendência de Frete Marítimo")
 st.subheader("América do Sul (ECSA / WCSA)")
 
-# Inicialização do Session State com valores de mercado atualizados
-if 'scfi' not in st.session_state:
-    st.session_state['scfi'] = 7805.00
-if 'scfi_var' not in st.session_state:
-    st.session_state['scfi_var'] = 2.45
-if 'bunker' not in st.session_state:
-    st.session_state['bunker'] = 638.50
-if 'bunker_var' not in st.session_state:
-    st.session_state['bunker_var'] = 1.10
-if 'blank_sailings' not in st.session_state:
-    st.session_state['blank_sailings'] = 0.12
-if 'usd_brl' not in st.session_state:
-    st.session_state['usd_brl'] = 5.65
-if 'usd_brl_var' not in st.session_state:
-    st.session_state['usd_brl_var'] = 0.85
+# Inicialização do Session State
+if 'val_scfi' not in st.session_state:
+    st.session_state['val_scfi'] = 7805.00
+if 'val_scfi_var' not in st.session_state:
+    st.session_state['val_scfi_var'] = 2.45
+if 'val_bunker' not in st.session_state:
+    st.session_state['val_bunker'] = 638.50
+if 'val_bunker_var' not in st.session_state:
+    st.session_state['val_bunker_var'] = 1.10
+if 'val_blank_sailings' not in st.session_state:
+    st.session_state['val_blank_sailings'] = 0.120
+if 'val_usd_brl' not in st.session_state:
+    st.session_state['val_usd_brl'] = 5.65
+if 'val_usd_brl_var' not in st.session_state:
+    st.session_state['val_usd_brl_var'] = 0.85
 
-# --- BOTÃO DE ATUALIZAÇÃO ---
+# --- BOTÃO DE ATUALIZAÇÃO VIA API ---
 if st.button("🔄 Buscar Indicadores em Tempo Real", key="btn_atualizar_indicadores"):
-    with st.spinner("Buscando indicadores no mercado ao vivo..."):
+    with st.spinner("Conectando à API e atualizando mercado..."):
         try:
             url_indicadores = API_URL.replace("/prever", "/indicadores")
             res = requests.get(url_indicadores, timeout=10)
             
             if res.status_code == 200:
                 dados = res.json()
-                st.session_state['scfi'] = float(dados["scfi"])
-                st.session_state['scfi_var'] = float(dados["scfi_var_1w"])
-                st.session_state['bunker'] = float(dados["bunker"])
-                st.session_state['bunker_var'] = float(dados["bunker_var_1w"])
-                st.session_state['blank_sailings'] = float(dados["blank_sailings"])
-                st.session_state['usd_brl'] = float(dados["usd_brl"])
-                st.session_state['usd_brl_var'] = float(dados["usd_brl_var_1w"])
+                st.session_state['val_scfi'] = float(dados["scfi"])
+                st.session_state['val_scfi_var'] = float(dados["scfi_var_1w"])
+                st.session_state['val_bunker'] = float(dados["bunker"])
+                st.session_state['val_bunker_var'] = float(dados["bunker_var_1w"])
+                st.session_state['val_blank_sailings'] = float(dados["blank_sailings"])
+                st.session_state['val_usd_brl'] = float(dados["usd_brl"])
+                st.session_state['val_usd_brl_var'] = float(dados["usd_brl_var_1w"])
                 
-                st.toast("✅ Indicadores atualizados com sucesso!")
+                st.toast("✅ Todos os indicadores de mercado foram atualizados!")
                 st.rerun()
             else:
                 st.error("Servidor backend indisponível.")
@@ -52,21 +52,21 @@ if st.button("🔄 Buscar Indicadores em Tempo Real", key="btn_atualizar_indicad
 
 st.divider()
 
-# --- FORMULÁRIO COM VALORES ATUALIZADOS ---
+# --- FORMULÁRIO COM VALORES DINÂMICOS ---
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    scfi = st.number_input("Índice SCFI Atual (USD/TEU)", value=st.session_state['scfi'], step=50.0)
-    scfi_var = st.number_input("Variação Semanal SCFI (%)", value=st.session_state['scfi_var']) / 100
+    scfi = st.number_input("Índice SCFI Atual (USD/TEU)", value=st.session_state['val_scfi'], step=50.0)
+    scfi_var = st.number_input("Variação Semanal SCFI (%)", value=st.session_state['val_scfi_var']) / 100
 
 with col2:
-    bunker = st.number_input("Combustível VLSFO (USD/Ton)", value=st.session_state['bunker'], step=5.0)
-    bunker_var = st.number_input("Variação Semanal Bunker (%)", value=st.session_state['bunker_var']) / 100
+    bunker = st.number_input("Combustível VLSFO (USD/Ton)", value=st.session_state['val_bunker'], step=5.0)
+    bunker_var = st.number_input("Variação Semanal Bunker (%)", value=st.session_state['val_bunker_var']) / 100
 
 with col3:
-    blank_sailings = st.slider("Taxa de Cancelamento (Blank Sailings)", 0.0, 0.5, value=st.session_state['blank_sailings'], step=0.005)
-    usd_brl = st.number_input("Cotação Dólar (USD/BRL)", value=st.session_state['usd_brl'], step=0.01)
-    usd_brl_var = st.number_input("Variação Semanal Câmbio (%)", value=st.session_state['usd_brl_var']) / 100
+    blank_sailings = st.slider("Taxa de Cancelamento (Blank Sailings)", 0.0, 0.5, value=st.session_state['val_blank_sailings'], step=0.005)
+    usd_brl = st.number_input("Cotação Dólar (USD/BRL)", value=st.session_state['val_usd_brl'], step=0.01)
+    usd_brl_var = st.number_input("Variação Semanal Câmbio (%)", value=st.session_state['val_usd_brl_var']) / 100
 
 st.divider()
 

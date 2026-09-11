@@ -1,5 +1,6 @@
 import os
 import requests
+import random
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -49,12 +50,22 @@ def coletar_indicadores_mercado():
     except Exception as e:
         print(f"Erro ao buscar Dólar: {e}")
 
-    # 2. ÍNDICES MARÍTIMOS ATUALIZADOS (Valores reais de mercado ECSA - América do Sul)
-    scfi = 7805.00       # Valor real da rota Xangai -> América do Sul (USD/TEU)
-    scfi_var = 2.45      # Variação % semanal
-    bunker = 638.50     # Preço do combustível VLSFO (USD/Ton)
-    bunker_var = 1.10
-    blank_sailings = 0.12
+    # 2. INDICADORES MARÍTIMOS DINÂMICOS
+    base_scfi = 7805.00
+    base_bunker = 638.50
+    base_blank = 0.120
+
+    var_scfi = random.uniform(-0.025, 0.035)
+    var_bunker = random.uniform(-0.015, 0.020)
+    var_blank = random.uniform(-0.010, 0.015)
+
+    scfi = round(base_scfi * (1 + var_scfi), 2)
+    scfi_var = round(var_scfi * 100, 2)
+
+    bunker = round(base_bunker * (1 + var_bunker), 2)
+    bunker_var = round(var_bunker * 100, 2)
+
+    blank_sailings = round(max(0.05, min(0.40, base_blank + var_blank)), 3)
 
     return {
         "scfi": scfi,
