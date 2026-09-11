@@ -28,6 +28,8 @@ if 'val_usd_brl' not in st.session_state:
     st.session_state['val_usd_brl'] = 5.10
 if 'val_usd_brl_var' not in st.session_state:
     st.session_state['val_usd_brl_var'] = 0.85
+if 'val_usd_cma_cgm' not in st.session_state:
+    st.session_state['val_usd_cma_cgm'] = 5.55
 
 # --- BOTÃO DE ATUALIZAÇÃO VIA API ---
 if st.button("🔄 Buscar Indicadores em Tempo Real", key="btn_atualizar_indicadores"):
@@ -47,13 +49,27 @@ if st.button("🔄 Buscar Indicadores em Tempo Real", key="btn_atualizar_indicad
                 st.session_state['val_blank_sailings'] = float(dados["blank_sailings"])
                 st.session_state['val_usd_brl'] = float(dados["usd_brl"])
                 st.session_state['val_usd_brl_var'] = float(dados["usd_brl_var_1w"])
+                st.session_state['val_usd_cma_cgm'] = float(dados.get("usd_cma_cgm", 5.55))
                 
-                st.toast("✅ Todos os indicadores foram atualizados com sucesso!")
+                st.toast("✅ Indicadores atualizados (incluindo Dólar Armador CMA CGM)!")
                 st.rerun()
             else:
                 st.error("Servidor backend indisponível.")
         except Exception:
             st.error("Erro de conexão com a API de indicadores.")
+
+st.divider()
+
+# --- CARTOES DE DESTAQUE CAMBIAL ---
+col_m1, col_m2 = st.columns(2)
+with col_m1:
+    st.metric("Dólar PTAX / Comercial (DUIMP)", f"R$ {st.session_state['val_usd_brl']:.2f}")
+with col_m2:
+    st.metric(
+        "Dólar Armador (CMA CGM)", 
+        f"R$ {st.session_state['val_usd_cma_cgm']:.2f}",
+        help="Taxa do dia para pagamento de frete/THC cobrada pela CMA CGM Brasil"
+    )
 
 st.divider()
 
@@ -68,8 +84,9 @@ bunker = st.number_input("Combustível VLSFO (USD/Ton)", value=st.session_state[
 bunker_var = st.number_input("Variação Semanal Bunker (%)", value=st.session_state['val_bunker_var']) / 100
 
 blank_sailings = st.slider("Taxa de Cancelamento (Blank Sailings)", 0.0, 0.5, value=st.session_state['val_blank_sailings'], step=0.005)
-usd_brl = st.number_input("Cotação Dólar (USD/BRL)", value=st.session_state['val_usd_brl'], step=0.01)
+usd_brl = st.number_input("Cotação Dólar Comercial / DUIMP (USD/BRL)", value=st.session_state['val_usd_brl'], step=0.01)
 usd_brl_var = st.number_input("Variação Semanal Câmbio (%)", value=st.session_state['val_usd_brl_var']) / 100
+usd_cma_cgm = st.number_input("Dólar Armador CMA CGM (USD/BRL)", value=st.session_state['val_usd_cma_cgm'], step=0.01)
 
 st.divider()
 

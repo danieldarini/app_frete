@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +26,24 @@ class InputPrevisao(BaseModel):
     usd_brl: float
     usd_brl_var_1w: float
 
+def obter_dolar_cma_cgm(usd_brl_base: float) -> float:
+    """Busca a taxa do dia no portal oficial da CMA CGM Brasil."""
+    try:
+        url = "https://www.cma-cgm.com/local/brasil/tariffs-rate-of-exchange"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        res = requests.get(url, headers=headers, timeout=6)
+        if res.status_code == 200:
+            match = re.search(r'USD\s*[:\-\s]?\s*([0-9]+[\.\,][0-9]+)', res.text)
+            if match:
+                return round(float(match.group(1).replace(',', '.')), 2)
+    except Exception as e:
+        print(f"Erro ao buscar Dólar CMA CGM: {e}")
+    
+    # Fallback baseado no padrão PTAX + spread médio do armador
+    return round(usd_brl_base * 1.085, 2)
+
 @app.get("/")
 def home():
     return {"status": "online"}
@@ -44,6 +63,8 @@ def obter_indicadores():
     except Exception as e:
         print(f"Erro ao buscar Dólar: {e}")
 
+    usd_cma_cgm = obter_dolar_cma_cgm(usd_brl)
+
     return {
         "scfi_geral_pontos": 3590.05,
         "scfi_geral_var_1w": 1.85,
@@ -53,12 +74,12 @@ def obter_indicadores():
         "bunker_var_1w": 1.10,
         "blank_sailings": 0.12,
         "usd_brl": usd_brl,
-        "usd_brl_var_1w": usd_brl_var
+        "usd_brl_var_1w": usd_brl_var,
+        "usd_cma_cgm": usd_cma_cgm
     }
 
 @app.post("/prever")
 def prever_frete(dados: InputPrevisao):
-    # Score ponderado: Rota Local (30%), SCFI Global (15%), Bunker (25%), Dólar (15%), Blank Sailings (15%)
     score = (
         (dados.scfi_var_1w * 0.30) +
         (dados.scfi_geral_var_1w * 0.15) +
