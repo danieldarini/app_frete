@@ -1,13 +1,10 @@
 import os
 import requests
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(
-    title="API de Previsão de Frete Marítimo",
-    description="Backend para cálculo de tendência de frete marítimo."
-)
+app = FastAPI(title="API de Previsão de Frete Marítimo")
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,16 +16,18 @@ app.add_middleware(
 
 class InputPrevisao(BaseModel):
     scfi: float
+    scfi_var_1w: float
+    scfi_geral_pontos: float
+    scfi_geral_var_1w: float
     bunker: float
+    bunker_var_1w: float
     blank_sailings: float
     usd_brl: float
-    scfi_var_1w: float
-    bunker_var_1w: float
     usd_brl_var_1w: float
 
 @app.get("/")
 def home():
-    return {"status": "online", "message": "API Operacional"}
+    return {"status": "online"}
 
 @app.get("/indicadores")
 def obter_indicadores():
@@ -36,7 +35,6 @@ def obter_indicadores():
     usd_brl = 5.10
     usd_brl_var = 0.85
 
-    # Cotação do Dólar Ao Vivo
     try:
         res_usd = requests.get("https://economia.awesomeapi.com.br/last/USD-BRL", headers=headers, timeout=5)
         if res_usd.status_code == 200:
@@ -46,8 +44,9 @@ def obter_indicadores():
     except Exception as e:
         print(f"Erro ao buscar Dólar: {e}")
 
-    # Retorna EXATAMENTE os valores de referência da tabela
     return {
+        "scfi_geral_pontos": 3590.05,
+        "scfi_geral_var_1w": 1.85,
         "scfi": 7805.00,
         "scfi_var_1w": 2.45,
         "bunker": 638.50,
@@ -59,8 +58,10 @@ def obter_indicadores():
 
 @app.post("/prever")
 def prever_frete(dados: InputPrevisao):
+    # Score ponderado: Rota Local (30%), SCFI Global (15%), Bunker (25%), Dólar (15%), Blank Sailings (15%)
     score = (
-        (dados.scfi_var_1w * 0.45) +
+        (dados.scfi_var_1w * 0.30) +
+        (dados.scfi_geral_var_1w * 0.15) +
         (dados.bunker_var_1w * 0.25) +
         (dados.usd_brl_var_1w * 0.15) +
         (dados.blank_sailings * 0.15)
